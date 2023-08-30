@@ -1,0 +1,67 @@
+original note Dec 2021.
+
+for layer 1.
+
+layer 1 class.  this uses a single int with 68uS timing (half a short bit) as all bits are a multiple of this
+
+it will also take care of 10mS tick and 1ms tick.
+
+you can then call AddChannel which will create a new DCCpacket object which can be used for SM or Main
+and you can assign which bits it operates on with multiple calls to add more bit pairs if required.
+
+this way its possible to create independent mains or sm/main or sm/sm if you really want.
+
+if you want to parallel outputs, just create one channel and do a multibit call.
+
+1's are 58us half cycles.  zeros are notinally 100us or greater and max 9900 uS   i.e. 116uS is ok
+
+
+If the clock is 80MHz and assuming a 20MHz instruction cycle, then 86uS is 1160 instr so should be no concerns
+about queing up bits even for several channels
+https://www.esp32.com/viewtopic.php?t=11678
+// 2*REG_WRITE(GPIO_OUT_W1TS_REG, BIT13); 92.50ns = 22 cycles
+GPIO.out_w1ts = (1 << GPIO_NUM_x);
+GPIO.out_w1tc = (1 << GPIO_NUM_x);    yeah so don't use REG_WRITE macro
+
+
+
+https://stackoverflow.com/questions/52348930/esp32-direct-port-manipulation
+is it a 16bit map or 32bit?   32bit see below, but register values below 32 map to out and not out1
+https://esp32.com/viewtopic.php?t=1746
+
+The GPIOs have a configuration register each, but the value is set using 4 32-bit registers, 
+namely GPIO_OUT_W1TS/W1TC and GPIO_OUT1_W1TS/W1TC. You use the GPIO_OUT_* register to modify GPIO0-31,
+ you use GPIO_OUT1_* to modify GPIO32 and higher. When you write an 1 in a bit in a W1TC register,
+ you'll make the GPIOs associated with these bits low, when you write an 1 in a bit position in a W1TS register,
+ you make the corresponding GPIO high. (W1TC = Write 1 To Clear, W1TS = Write 1 To Set.)
+ For both registers, any GPIO written 0 does not change.
+
+
+2023-06
+https://arduino.stackexchange.com/questions/44531/arduino-esp8266-direct-fast-control-of-the-digital-pins
+On the esp8266 I write to the timer and change the period for 1s and 0s.
+On the 32, I set the timer once to 58uS and then run double-counts for the 0s.
+And because I do this (i.e. fixed 58uS) its possible to run different data through two output streams and thus support
+main and prog-track if required.
+
+I think also that the 8266 layer1 code is actually C and not C++ because we use this->that rather than dots
+actually maybe not, because gpio is declared as a struct, so if you want to access its members via a pointer, you need ->
+rather than dot which is if you are working on var which is the struct.
+
+
+compiler was complaining these are deprecated.
+
+
+DCClayer1.cpp: 275:13: warning: 'RTC_REG_WRITE' macro is deprecated
+   275 |   RTC_REG_WRITE(FRC1_LOAD_ADDRESS, 0);  \\This starts timer
+
+DCClayer1.cpp: 270:30: warning: 'void dcc_intr_handler()' is deprecated: Use IRAM_ATTR in place of ICACHE_RAM_ATTR to move functions into IRAM [-Wdeprecated-declarations]
+   270 |   ETS_FRC_TIMER1_INTR_ATTACH(dcc_intr_handler, NULL)
+
+DCClayer1.cpp: 485:30: warning: 'void pwm_intr_handler()' is deprecated: Use IRAM_ATTR in place of ICACHE_RAM_ATTR to move functions into IRAM [-Wdeprecated-declarations]
+   485 |   ETS_FRC_TIMER1_INTR_ATTACH(pwm_intr_handler, NULL)
+
+
+DCCweb.cpp: 38:6: warning: 'SPIFFS' is deprecated: SPIFFS has been deprecated. Please consider moving to LittleFS or other filesystems. [-Wdeprecated-declarations]
+   38 |  if (SPIFFS.exists("\index.htm")) {
+
